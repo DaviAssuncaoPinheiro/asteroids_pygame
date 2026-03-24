@@ -1,4 +1,7 @@
 
+# ASTEROIDE SINGLEPLAYER v1.0
+# This file manages the application loop, scenes, input handling, and screen drawing.
+
 import random
 import sys
 from dataclasses import dataclass
@@ -16,6 +19,7 @@ class Scene:
 
 
 class Game:
+    # Initialize pygame, shared UI resources, and the initial scene state.
     def __init__(self):
         pg.init()
         if C.RANDOM_SEED is not None:
@@ -29,6 +33,7 @@ class Game:
         self.world = World()
 
     def run(self):
+        # Process events, update the active scene, and render each frame.
         while True:
             dt = self.clock.tick(C.FPS) / 1000.0
             for e in pg.event.get():
@@ -59,6 +64,7 @@ class Game:
             pg.display.flip()
 
     def draw_menu(self):
+        # Draw the title screen and the basic control instructions.
         text(self.screen, self.big, "ASTEROIDS",
              C.WIDTH // 2 - 150, 180)
         text(self.screen, self.font,
