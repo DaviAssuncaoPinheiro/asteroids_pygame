@@ -8,7 +8,7 @@ from random import uniform
 import pygame as pg
 
 import config as C
-from sprites import Asteroid, Ship, UFO
+from sprites import Asteroid, Ship, UFO, BlackHole
 from utils import Vec, rand_edge_pos, rand_unit_vec
 
 
@@ -20,6 +20,9 @@ class World:
         self.ufo_bullets = pg.sprite.Group()
         self.asteroids = pg.sprite.Group()
         self.ufos = pg.sprite.Group()
+        self.black_hole = None
+        self.bh_timer = uniform(C.BH_TIMER_MIN, C.BH_TIMER_MAX)
+        self.bh_duration = 0
         self.all_sprites = pg.sprite.Group(self.ship)
         self.score = 0
         self.lives = C.START_LIVES
@@ -68,6 +71,17 @@ class World:
                 self.ufo_bullets.add(bullet)
                 self.all_sprites.add(bullet)
 
+    def spawn_black_hole(self):
+        pos = Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
+
+        while (pos - self.ship.pos).length() < 200:
+            pos = Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
+
+        bh = BlackHole(pos)
+        self.black_hole = bh
+        self.all_sprites.add(bh)
+        self.bh_duration = uniform(C.BH_DURATION_MIN, C.BH_DURATION_MAX)
+
     def try_fire(self):
         # Fire a player bullet when the bullet cap allows it.
         if len(self.bullets) >= C.MAX_BULLETS:
@@ -89,6 +103,29 @@ class World:
         # Update the world simulation, timers, enemy behavior, and progression.
         self.ship.control(keys, dt)
         self.all_sprites.update(dt)
+        
+        #spawn do buraco negro
+        if self.black_hole:
+            self.bh_duration -= dt
+            if self.bh_duration <= 0:
+                self.black_hole.kill()
+                self.black_hole = None
+                self.bh_timer = uniform(10, 20)
+        else:
+            self.bh_timer -= dt
+            if self.bh_timer <= 0:
+                self.spawn_black_hole()
+
+        #efeito de gravidade do buraco negro
+        if self.black_hole:
+            dir_vec = self.black_hole.pos - self.ship.pos
+            dist = dir_vec.length()
+
+            if dist > 0:
+                dir_vec = dir_vec.normalize()
+                force = self.black_hole.strength / (dist + 1) #diminui com a distancia
+                self.ship.vel += dir_vec * force * dt * 50
+
         if self.safe > 0:
             self.safe -= dt
             self.ship.invuln = 0.5
@@ -153,6 +190,13 @@ class World:
                     self.score += score
                     ufo.kill()
                     b.kill()
+
+        if self.black_hole:
+            dist = (self.black_hole.pos - self.ship.pos).length()
+            if dist < self.black_hole.r + self.ship.r:
+                self.lives = 0
+                self.game_over = True
+                return
 
     def split_asteroid(self, ast: Asteroid):
         # Destroy an asteroid, award score, and spawn its smaller fragments.

@@ -238,3 +238,21 @@ class UFO(pg.sprite.Sprite):
         cup = pg.Rect(0, 0, w * 0.5, h * 0.7)
         cup.center = (self.pos.x, self.pos.y - h * 0.3)
         pg.draw.ellipse(surf, C.WHITE, cup, width=1)
+
+
+class BlackHole(pg.sprite.Sprite):
+    def __init__(self, pos: Vec):
+        super().__init__()
+        self.pos = Vec(pos)
+        self.r = C.BLACK_HOLE_RADIUS  #raio que mata
+        self.visual_r = C.BLACK_HOLE_VISUAL_RADIUS  #raio visual
+        self.strength = C.BLACK_HOLE_STRENGTH
+        self.rect = pg.Rect(0, 0, self.visual_r * 2, self.visual_r * 2)
+
+    def update(self, dt: float):
+        self.rect.center = self.pos
+
+    def draw(self, surf: pg.Surface):
+        pg.draw.circle(surf, C.PURPLE, self.pos, self.visual_r) #aura
+        pg.draw.circle(surf, C.VIOLET, self.pos, self.visual_r - 4, 2) #anel
+        pg.draw.circle(surf, C.BLACK, self.pos, self.r) #centro
