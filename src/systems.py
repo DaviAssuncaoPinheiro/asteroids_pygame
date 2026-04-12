@@ -8,7 +8,7 @@ from random import uniform
 import pygame as pg
 
 import config as C
-from sprites import Asteroid, Ship, UFO, BlackHole, Parasite
+from sprites import Asteroid, Boss, BossBullet, Ship, UFO, BlackHole, Parasite
 from utils import Vec, rand_edge_pos, rand_unit_vec
 
 
@@ -33,6 +33,13 @@ class World:
         self.safe = C.SAFE_SPAWN_TIME
         self.ufo_timer = C.UFO_SPAWN_EVERY
         self.game_over = False  # Sinaliza fim de jogo para a cena principal
+        self.boss = None
+        self.boss_active = False
+        self.boss_warning = 0.0
+        self.boss_bullets = pg.sprite.Group()
+        self.boss_defeated_timer = 0.0
+
+
 
     def start_wave(self):
         # Spawn a new asteroid wave with difficulty based on the current round.
@@ -116,16 +123,18 @@ class World:
                 spr.update(dt)
         
         #spawn do buraco negro
-        if self.black_hole:
-            self.bh_duration -= dt
-            if self.bh_duration <= 0:
-                self.black_hole.kill()
-                self.black_hole = None
-                self.bh_timer = uniform(10, 20)
-        else:
-            self.bh_timer -= dt
-            if self.bh_timer <= 0:
-                self.spawn_black_hole()
+        if not self.boss_active:
+            if self.black_hole:
+                self.bh_duration -= dt
+                if self.bh_duration <= 0:
+                    self.black_hole.kill()
+                    self.black_hole = None
+                    self.bh_timer = uniform(10, 20)
+            else:
+                self.bh_timer -= dt
+                if self.bh_timer <= 0:
+                    self.spawn_black_hole()
+
 
         #efeito de gravidade do buraco negro
         if self.black_hole:
@@ -138,21 +147,25 @@ class World:
                 self.ship.vel += dir_vec * force * dt * 50
 
         # spawn de parasite
-        self.parasite_timer -= dt
-        if self.parasite_timer <= 0:
-            self.spawn_parasite()
-            self.parasite_timer = uniform(C.PARASITE_TIMER_MIN, C.PARASITE_TIMER_MAX)
+        if not self.boss_active:
+            self.parasite_timer -= dt
+            if self.parasite_timer <= 0:
+                self.spawn_parasite()
+                self.parasite_timer = uniform(C.PARASITE_TIMER_MIN, C.PARASITE_TIMER_MAX)
 
         if self.safe > 0:
             self.safe -= dt
             self.ship.invuln = 0.5
-        if self.ufos:
-            self.ufo_try_fire()
-        else:
-            self.ufo_timer -= dt
-        if not self.ufos and self.ufo_timer <= 0:
-            self.spawn_ufo()
-            self.ufo_timer = C.UFO_SPAWN_EVERY
+
+        if not self.boss_active:
+            if self.ufos:
+                self.ufo_try_fire()
+            else:
+                self.ufo_timer -= dt
+            if not self.ufos and self.ufo_timer <= 0:
+                self.spawn_ufo()
+                self.ufo_timer = C.UFO_SPAWN_EVERY
+
         
         for p in self.parasites:
             p.update(dt, self.ship)
@@ -161,11 +174,75 @@ class World:
 
         self.handle_collisions()
 
-        if not self.asteroids and self.wave_cool <= 0:
-            self.start_wave()
+        if self.boss_defeated_timer > 0:
+            self.boss_defeated_timer -= dt
+            if self.boss_defeated_timer <= 0:
+                self.start_wave()
+            return
+
+        if self.boss_active:
+            self.update_boss(dt)
+        elif self.boss_warning > 0:
+            self.boss_warning -= dt
+            if self.boss_warning <= 0:
+                self.spawn_boss()
+        elif not self.asteroids and self.wave_cool <= 0:
+            if self.wave == 0:
+                self.start_wave()
+            else:    
+                self.boss_warning = C.BOSS_WARNING_TIME
             self.wave_cool = C.WAVE_DELAY
         elif not self.asteroids:
             self.wave_cool -= dt
+
+    def spawn_boss(self):
+        if self.black_hole:
+            self.black_hole.kill()
+            self.black_hole = None
+        for ufo in list(self.ufos):
+            ufo.kill()
+        for p in list(self.parasites):
+            p.kill()
+
+        self.boss = Boss()
+        self.boss_active = True
+        self.all_sprites.add(self.boss)
+
+    def update_boss(self, dt):
+        if not self.boss or not self.boss.alive():
+            self.boss_active = False
+            self.boss = None
+            for b in list(self.boss_bullets):
+                b.kill()
+            self.boss_bullets.empty()
+            self.boss_defeated_timer = 2.0
+            return
+
+        self.boss._eye_target = self.ship.pos
+        self.boss.update(dt)
+
+        for b in list(self.boss_bullets):
+            b.update(dt)
+
+        bullet = self.boss.try_fire(self.ship.pos)
+        if bullet:
+            self.boss_bullets.add(bullet)
+            self.all_sprites.add(bullet)
+
+        barrage = self.boss.try_barrage()
+        for b in barrage:
+            self.boss_bullets.add(b)
+            self.all_sprites.add(b)
+
+        self.boss.try_dash(self.ship.pos)
+
+        if self.boss.asteroid_cool <= 0:
+            self.boss.asteroid_cool = C.BOSS_ASTEROID_INTERVAL
+            aim = Vec(self.ship.pos) - self.boss.pos
+            if aim.length_squared() > 0:
+                aim = aim.normalize()
+            vel = aim * uniform(C.AST_VEL_MIN, C.AST_VEL_MAX) * 1.5
+            self.spawn_asteroid(Vec(self.boss.pos), vel, "M")
 
     def handle_collisions(self):
         # Resolve collisions between bullets, asteroids, UFOs, and the ship.
@@ -228,7 +305,24 @@ class World:
                 if (p.pos - self.ship.pos).length() < (p.r + self.ship.r):
                     p.attach(self.ship)
 
-        
+        if self.boss and self.boss.alive():
+            for b in list(self.bullets):
+                if (self.boss.pos - b.pos).length() < self.boss.r:
+                    b.kill()
+                    self.boss.take_damage(C.BOSS_DAMAGE_PER_HIT)
+                    if self.boss.hp <= 0:
+                        self.score += C.BOSS_SCORE
+                        break
+
+            if self.ship.invuln <= 0 and self.safe <= 0:
+                if (self.boss.pos - self.ship.pos).length() < self.boss.r + self.ship.r:
+                    self.ship_die()
+                for bb in list(self.boss_bullets):
+                    if (bb.pos - self.ship.pos).length() < bb.r + self.ship.r:
+                        bb.kill()
+                        self.ship_die()
+                        break
+
 
         if self.black_hole:
             dist = (self.black_hole.pos - self.ship.pos).length()
@@ -281,3 +375,16 @@ class World:
         else:
             dl = font.render("DASH OK", True, C.WHITE)
         surf.blit(dl, (C.WIDTH - 130, 10))
+        if self.boss and self.boss.alive():
+            self.boss.draw_hp_bar(surf)
+
+        if self.boss_warning > 0 and not self.boss_active:
+            warn = font.render("!! BOSS INCOMING !!", True, C.RED)
+            rect = warn.get_rect(center=(C.WIDTH // 2, C.HEIGHT // 2))
+            surf.blit(warn, rect)
+
+        if self.boss_defeated_timer > 0:
+            msg = font.render("BOSS DEFEATED!", True, C.ORANGE)
+            rect = msg.get_rect(center=(C.WIDTH // 2, C.HEIGHT // 2))
+            surf.blit(msg, rect)
+
