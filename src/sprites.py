@@ -1,4 +1,3 @@
-
 # ASTEROIDE SINGLEPLAYER v1.0
 # This file defines the interactive game entities and their local behaviors.
 
@@ -165,6 +164,17 @@ class Ship(pg.sprite.Sprite):
         # self.cooldown_timer = 0.0
         # self._pre_dash_vel = None
         self.has_spread_shot = False
+        self.shield_active = False
+        self.shield_timer = 0.0      # tempo restante de duração
+        self.shield_cooldown = 0.0   # tempo restante de cooldown
+
+    def activate_shield(self):
+        # Ativa o shield se não estiver em cooldown e não estiver já ativo.
+        if self.shield_active or self.shield_cooldown > 0:
+            return
+        self.shield_active = True
+        self.shield_timer = C.SHIELD_DURATION
+        self.shield_cooldown = C.SHIELD_COOLDOWN
 
     def control(self, keys: pg.key.ScancodeWrapper, dt: float):
         # Apply rotation, thrust, and friction from the current input state.
@@ -185,8 +195,6 @@ class Ship(pg.sprite.Sprite):
         # friction = C.SHIP_FRICTION - (slow - 1) * 0.02
         # friction = max(0.90, friction)  # evita travar demais
         # self.vel *= friction    #antiga velocidade
-        
-        
 
     def fire(self):
         if self.cool > 0:
@@ -237,6 +245,15 @@ class Ship(pg.sprite.Sprite):
             self.cool -= dt
         if self.invuln > 0:
             self.invuln -= dt
+        if self.shield_active:
+            self.shield_timer -= dt
+            if self.shield_timer <= 0:
+                self.shield_active = False
+                self.shield_timer = 0.0
+        elif self.shield_cooldown > 0:
+            self.shield_cooldown -= dt
+            if self.shield_cooldown < 0:
+                self.shield_cooldown = 0.0
         # if self.cooldown_timer > 0:
         #     self.cooldown_timer -= dt
         #     if self.cooldown_timer < 0:
@@ -267,6 +284,19 @@ class Ship(pg.sprite.Sprite):
         #     draw_circle(surf, self.pos, self.r + 6)
         if self.invuln > 0 and int(self.invuln * 10) % 2 == 0:
             draw_circle(surf, self.pos, self.r + 6)
+        if self.shield_active:
+            shield_r = self.r + C.SHIELD_RADIUS_OFFSET
+            pulse = int(self.shield_timer * 8) % 2  # pisca levemente ao final
+            alpha = 200 if self.shield_timer > 0.5 or pulse == 0 else 80
+            shield_surf = pg.Surface((shield_r * 2 + 4, shield_r * 2 + 4), pg.SRCALPHA)
+            pg.draw.circle(
+                shield_surf,
+                (*C.SHIELD_COLOR, alpha),
+                (shield_r + 2, shield_r + 2),
+                shield_r,
+                3,
+            )
+            surf.blit(shield_surf, (self.pos.x - shield_r - 2, self.pos.y - shield_r - 2))
 
 
 class UFO(pg.sprite.Sprite):
