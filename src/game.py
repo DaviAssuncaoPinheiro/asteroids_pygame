@@ -1,4 +1,3 @@
-
 # ASTEROIDE SINGLEPLAYER v1.0
 # This file manages the application loop, scenes, input handling, and screen drawing.
 
@@ -35,7 +34,7 @@ class Game:
         self.go_fade = 0.0      # Temporizador de fade-in da tela de game over
 
     def run(self):
-        # Process events, update the active scene, and render each frame.
+        
         while True:
             dt = self.clock.tick(C.FPS) / 1000.0
             for e in pg.event.get():
@@ -55,8 +54,14 @@ class Game:
                             self.world.try_fire()
                         if e.key == pg.K_LSHIFT:
                             self.world.hyperspace()
+                        if e.key == pg.K_s:
+                            self.world.try_shield()
+                        # if e.key == pg.K_RSHIFT:
+                        #     self.world.try_dash()
                         if e.key == pg.K_RSHIFT:
-                            self.world.try_dash()
+                            self.world.try_spread()
+      
+      
                     elif self.scene.name == "menu":
                         self.world = World()
                         self.scene = Scene("play")
@@ -109,11 +114,14 @@ class Game:
              C.WIDTH // 2 - 90, C.HEIGHT // 2 + 80)
 
     def draw_menu(self):
-        # Draw the title screen and the basic control instructions.
+        
         text(self.screen, self.big, "ASTEROIDS",
              C.WIDTH // 2 - 150, 180)
         text(self.screen, self.font,
-             "Setas: virar/acelerar  Espaco: tiro  LShift: hiper  RShift: dash",
-             100, 300)
+             "Setas: virar/acelerar  Espaco: tiro  LShift: hiper  S: shield",
+             120, 300)
         text(self.screen, self.font,
-             "Pressione qualquer tecla...", 260, 360)
+             "RShift: tiro espalhado (15s cooldown)",
+             230, 330)
+        text(self.screen, self.font,
+             "Pressione qualquer tecla...", 260, 390)
