@@ -466,16 +466,3 @@ class World:
         if self.freeze_timer > 0:
             fl = font.render(f"FREEZE: {self.freeze_timer:.1f}s", True, C.ICY_BLUE)
             surf.blit(fl, (C.WIDTH // 2 - fl.get_width() // 2, 10))
-
-        # if self.boss and self.boss.alive():
-        #     self.boss.draw_hp_bar(surf)
-
-        # if self.boss_warning > 0 and not self.boss_active:
-        #     warn = font.render("!! BOSS INCOMING !!", True, C.RED)
-        #     rect = warn.get_rect(center=(C.WIDTH // 2, C.HEIGHT // 2))
-        #     surf.blit(warn, rect)
-
-        # if self.boss_defeated_timer > 0:
-        #     msg = font.render("BOSS DEFEATED!", True, C.ORANGE)
-        #     rect = msg.get_rect(center=(C.WIDTH // 2, C.HEIGHT // 2))
-        #     surf.blit(msg, rect)
